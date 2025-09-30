@@ -44,13 +44,13 @@
             
             <form id="loginForm" class="space-y-6">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">รหัสผู้ใช้</label>
-                    <input type="text" id="username" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" placeholder="กรอกรหัสผู้ใช้ (เช่น admin หรือ P001)" required>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">User ID</label>
+                    <input type="text" id="userId" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" placeholder="เช่น p001" required>
                 </div>
                 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">รหัสผ่าน</label>
-                    <input type="password" id="password" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" placeholder="รหัสผ่าน (ตัวอย่าง: 123)" required>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                    <input type="password" id="password" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" placeholder="เช่น 1234" required>
                 </div>
                 
                 <button type="submit" id="loginBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center">
@@ -210,7 +210,7 @@
                     </div>
                 </div>
 
-                <!-- สถิติตามเภสัชกร / สถิติตามเวร (เพิ่มฟีเจอร์ แต่คุมสไตล์เดิม) -->
+                <!-- สถิติตามเภสัชกร / สถิติตามเวร -->
                 <div id="statsSection" class="hidden mt-8">
                     <h3 class="text-lg font-semibold text-gray-800 mb-4">สถิติ</h3>
                     <div class="grid md:grid-cols-2 gap-6">
@@ -261,10 +261,15 @@
                             <label class="block text-sm font-medium text-gray-700 mb-2">ชื่อ-นามสกุล</label>
                             <input type="text" id="pharmacistName" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" placeholder="กรอกชื่อ-นามสกุลเภสัชกร" required>
                         </div>
-                        <!-- เพิ่มช่อง Email (คงสไตล์เดิม) เพื่อรองรับ ACL ฝั่ง Apps Script แต่ไม่แสดง username ปะปนกับชื่อ -->
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">อีเมล (บัญชี Google)</label>
-                            <input type="email" id="pharmacistEmail" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" placeholder="name@hospital.or.th">
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">User ID</label>
+                                <input type="text" id="pharmacistUserId" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" placeholder="เช่น p001" required>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                                <input type="text" id="pharmacistPassword" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" placeholder="เช่น 1234" required>
+                            </div>
                         </div>
                         <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-4 rounded-lg transition-colors main-button flex items-center justify-center">
                             <span id="pharmacistSubmitText">เพิ่มเภสัชกร</span>
@@ -330,17 +335,17 @@
     <script>
         // ====== CONFIG ======
         const CONFIG = {
-            SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxHRI513UoXCrhQSF7OWcW1VbPoUjnK6oy5vlqNeB60JWxQ78ehGPtavzs_rKTeT06Bnw/exec',
+            SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwrYQuaduMUY2AtUl4iY2g0zjVSCqO3HgXT4iaW13H03g0QmImifeIZw1ZxyVRPyFrUng/exec',
             SHEET_ID: '18w4VMq-JPDHDBGUC9g46m3jM-i5lzQzCh-2b0OPWvGo'
         };
         // =====================
 
         // Global state
-        let pharmacists = []; // array of {name, email?} OR strings
+        let pharmacists = []; // array of {name, userId}
         let shifts = [];
         let scheduleRowCounter = 0;
         let reportData = [];
-        let currentUser = null; // {id, name} - ฝั่ง UI
+        let currentUser = null; // {userId, name}
 
         // DOM shorthand
         const loginPage = document.getElementById('loginPage');
@@ -370,59 +375,46 @@
             document.getElementById(`${tabName}Tab`).classList.remove('hidden');
         }
 
-        // Login logic (ฝั่ง UI เท่านั้น เพื่อซ่อน/แสดงแท็บ Manage)
+        // --------- Login (UserID + Password จากชีต) ----------
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const username = document.getElementById('username').value.trim();
+            const userId = document.getElementById('userId').value.trim();
             const password = document.getElementById('password').value.trim();
 
             loginText.textContent = 'กำลังตรวจสอบ...';
             loginLoading.classList.remove('hidden');
             loginBtn.disabled = true;
 
-            // โหลดข้อมูลพื้นฐานถ้ายังไม่โหลด
-            if (pharmacists.length === 0 || shifts.length === 0) {
-                try { await Promise.all([loadPharmacists(), loadShifts()]); } catch (err) { console.error(err); }
-            }
+            try {
+                const resp = await fetch(CONFIG.SCRIPT_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({ action: 'login', userId, password })
+                });
+                const j = await resp.json();
+                if (!j.success) throw new Error(j.message || 'เข้าสู่ระบบไม่สำเร็จ');
 
-            // admin ฝั่ง UI
-            if (username === 'admin' && password === '123') {
-                currentUser = { id: 'admin', name: 'Administrator' };
-                afterLogin();
-                return;
-            }
+                currentUser = { userId: j.userId, name: j.name };
+                currentUserDisplay.textContent = `${currentUser.name} (${currentUser.userId})`;
 
-            // เภสัชกรทั่วไป: ยอมให้ใช้ layout ได้ (รหัสผ่าน 123) — ไม่มีการแสดง username รวมกับชื่อ
-            if (password === '123') {
-                currentUser = { id: 'pharmacist', name: 'ผู้ใช้งาน' };
-                afterLogin();
-                return;
-            }
-
-            showMessage(loginMessage, 'รหัสผู้ใช้หรือรหัสผ่านไม่ถูกต้อง', 'error');
-            loginText.textContent = 'เข้าสู่ระบบ';
-            loginLoading.classList.add('hidden');
-            loginBtn.disabled = false;
-        });
-
-        function afterLogin() {
-            showMessage(loginMessage, 'รหัสผ่านถูกต้อง กำลังเข้าสู่ระบบ...', 'success');
-            setTimeout(() => {
+                // เข้าสู่ระบบสำเร็จ → เปิดแอป
                 loginPage.classList.add('hidden');
                 mainApp.classList.remove('hidden');
-                currentUserDisplay.textContent = `${currentUser.name}`;
-                if (currentUser.id !== 'admin') {
-                    // ซ่อนแท็บจัดการข้อมูลสำหรับผู้ใช้ทั่วไป (คงโครง UI เดิม)
-                    document.querySelector('[data-tab="manage"]').classList.add('hidden');
-                }
-                loadInitialData();
-            }, 700);
-        }
+
+                await loadInitialData();
+            } catch (err) {
+                showMessage(loginMessage, err.message || 'เข้าสู่ระบบไม่สำเร็จ', 'error');
+                loginText.textContent = 'เข้าสู่ระบบ';
+                loginLoading.classList.add('hidden');
+                loginBtn.disabled = false;
+                return;
+            }
+        });
 
         document.getElementById('logoutBtn').addEventListener('click', () => {
             mainApp.classList.add('hidden');
             loginPage.classList.remove('hidden');
-            document.getElementById('loginForm').reset();
+            loginForm.reset();
             loginMessage.classList.add('hidden');
             currentUser = null;
             currentUserDisplay.textContent = '';
@@ -488,10 +480,9 @@
             });
         }
 
-        // Data loaders (รองรับทั้ง detailed/flat)
+        // Data loaders (รองรับ detailed/flat)
         async function loadPharmacists() {
             try {
-                // พยายามเรียก detailed ก่อน
                 let data;
                 try {
                     const r1 = await fetch(`${CONFIG.SCRIPT_URL}?action=getPharmacistsDetailed`);
@@ -501,11 +492,10 @@
                     const r2 = await fetch(`${CONFIG.SCRIPT_URL}?action=getPharmacists`);
                     data = await r2.json();
                 }
-                // normalize
                 const list = data?.pharmacists || [];
                 pharmacists = list.map(p => {
-                    if (typeof p === 'string') return { name: p, email: '' };
-                    return { name: p.name || '', email: p.email || '' };
+                    if (typeof p === 'string') return { name: p, userId: '' };
+                    return { name: p.name || '', userId: p.userId || '' };
                 });
             } catch (error) {
                 console.error('Error loading pharmacists:', error);
@@ -538,7 +528,7 @@
             pharmacists.forEach(p => {
                 const option = document.createElement('option');
                 option.value = p.name;           // ใช้ "ชื่อ" เป็นค่า value เพื่อไม่ปะปน username
-                option.textContent = p.name;     // แสดงชื่ออย่างเดียวตามที่สั่ง
+                option.textContent = p.name;     // แสดงชื่ออย่างเดียว
                 select.appendChild(option);
             });
         }
@@ -579,7 +569,7 @@
             });
         }
 
-        // Schedule submit (โพสต์ด้วยชื่อเภสัชกรเท่านั้น ตาม API ใหม่)
+        // ----- บันทึกตารางเวร -----
         document.getElementById('scheduleForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const pharmacistName = document.getElementById('pharmacistSelect').value;
@@ -618,7 +608,7 @@
                 for (const schedule of scheduleData) {
                     const body = {
                         action: 'addSchedule',
-                        pharmacist: pharmacistName, // ใช้ชื่อเท่านั้น
+                        pharmacist: pharmacistName, // ใช้ชื่ออย่างเดียว
                         date: schedule.workDate,
                         shift: schedule.shift
                     };
@@ -647,17 +637,14 @@
             }
         });
 
-        // Add pharmacist (ส่ง name + email; ไม่ปะปน username ในหน้าจอ)
+        // ----- เพิ่มเภสัชกร (ทุกคนที่ล็อกอินทำได้) -----
         document.getElementById('pharmacistForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            if (currentUser?.id !== 'admin') {
-                showMessage(document.getElementById('pharmacistMessage'), 'เฉพาะผู้ดูแลระบบเท่านั้น', 'error');
-                return;
-            }
             const name = document.getElementById('pharmacistName').value.trim();
-            const email = document.getElementById('pharmacistEmail').value.trim();
-            if (!name) {
-                showMessage(document.getElementById('pharmacistMessage'), 'กรุณากรอกชื่อ-นามสกุล', 'error');
+            const userId = document.getElementById('pharmacistUserId').value.trim();
+            const password = document.getElementById('pharmacistPassword').value.trim();
+            if (!name || !userId || !password) {
+                showMessage(document.getElementById('pharmacistMessage'), 'กรุณากรอกข้อมูลให้ครบถ้วน', 'error');
                 return;
             }
             const submitText = document.getElementById('pharmacistSubmitText');
@@ -668,7 +655,7 @@
                 const response = await fetch(CONFIG.SCRIPT_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({ action: 'addPharmacist', name, email })
+                    body: JSON.stringify({ action: 'addPharmacist', name, userId, password })
                 });
                 const resJson = await response.json();
                 if (!response.ok || resJson.error || resJson.success === false) throw new Error(resJson.error || resJson.message || 'Network error');
@@ -679,20 +666,16 @@
                 document.getElementById('pharmacistForm').reset();
             } catch (error) {
                 console.error('Error adding pharmacist:', error);
-                showMessage(document.getElementById('pharmacistMessage'), 'เกิดข้อผิดพลาดในการเพิ่มข้อมูล', 'error');
+                showMessage(document.getElementById('pharmacistMessage'), error.message || 'เกิดข้อผิดพลาดในการเพิ่มข้อมูล', 'error');
             } finally {
                 submitText.textContent = 'เพิ่มเภสัชกร';
                 loading.classList.add('hidden');
             }
         });
 
-        // Add shift
+        // ----- เพิ่มเวร (ทุกคนที่ล็อกอินทำได้) -----
         document.getElementById('shiftForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            if (currentUser?.id !== 'admin') {
-                showMessage(document.getElementById('shiftMessage'), 'เฉพาะผู้ดูแลระบบเท่านั้น', 'error');
-                return;
-            }
             const name = document.getElementById('shiftName').value.trim();
             if (!name) {
                 showMessage(document.getElementById('shiftMessage'), 'กรุณากรอกชื่อเวร', 'error');
@@ -717,14 +700,14 @@
                 document.getElementById('shiftForm').reset();
             } catch (error) {
                 console.error('Error adding shift:', error);
-                showMessage(document.getElementById('shiftMessage'), 'เกิดข้อผิดพลาดในการเพิ่มข้อมูล', 'error');
+                showMessage(document.getElementById('shiftMessage'), error.message || 'เกิดข้อผิดพลาดในการเพิ่มข้อมูล', 'error');
             } finally {
                 submitText.textContent = 'เพิ่มเวร';
                 loading.classList.add('hidden');
             }
         });
 
-        // Report
+        // ----- รายงาน -----
         document.getElementById('generateReportBtn').addEventListener('click', async () => {
             const startDate = document.getElementById('reportStartDate').value;
             const endDate = document.getElementById('reportEndDate').value;
@@ -742,14 +725,13 @@
             btnText.textContent = 'กำลังสร้างรายงาน...';
             loading.classList.remove('hidden');
             try {
-                // รายการตารางเวร
                 const response = await fetch(`${CONFIG.SCRIPT_URL}?action=getScheduleReport&startDate=${startDate}&endDate=${endDate}`);
                 const data = await response.json();
                 if (data.error) throw new Error(data.error);
                 reportData = data.schedules || [];
                 displayReport(reportData);
 
-                // สถิติ per pharmacist / per shift (ถ้ารองรับ)
+                // สถิติ per pharmacist / per shift
                 try {
                     const st = await fetch(`${CONFIG.SCRIPT_URL}?action=getPharmacistStats&startDate=${startDate}&endDate=${endDate}`);
                     const stats = await st.json();
